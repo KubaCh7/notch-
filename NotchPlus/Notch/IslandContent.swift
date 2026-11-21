@@ -12,27 +12,35 @@ enum IslandStyle: Equatable {
 
 /// What the island is currently showing. Each feature adds its own case.
 enum IslandContent {
+    case charging(PowerSnapshot)
+    case unplugged(PowerSnapshot)
 }
 
 extension IslandContent {
     var style: IslandStyle {
         switch self {
+        case .charging: return .pillThenCard
+        case .unplugged: return .pillOnly
         }
     }
 
     /// Used to coalesce repeated events of the same type in the queue.
     var kind: String {
         switch self {
+        case .charging, .unplugged: return "power"
         }
     }
 
     func pillSize(notch: CGSize) -> CGSize {
         switch self {
+        case .charging: return ChargingLayout.pillSize(notch: notch, plugged: true)
+        case .unplugged: return ChargingLayout.pillSize(notch: notch, plugged: false)
         }
     }
 
     func cardSize(notch: CGSize) -> CGSize {
         switch self {
+        case .charging, .unplugged: return ChargingLayout.cardSize(notch: notch)
         }
     }
 }
@@ -45,6 +53,10 @@ struct IslandContentView: View {
 
     var body: some View {
         switch content {
+        case .charging(let snapshot):
+            ChargingIslandView(snapshot: snapshot, plugged: true, phase: phase, notch: notch)
+        case .unplugged(let snapshot):
+            ChargingIslandView(snapshot: snapshot, plugged: false, phase: phase, notch: notch)
         }
     }
 }
