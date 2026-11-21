@@ -1,4 +1,5 @@
 import AppKit
+import IOBluetooth
 
 /// Wires system monitors to the notch controller.
 @MainActor
@@ -8,6 +9,11 @@ final class AppCoordinator {
     private let notch = NotchController.shared
     private let settings = AppSettings.shared
     private let power = PowerMonitor()
+    private let bluetooth = BluetoothMonitor()
+    private let batteryProvider: BatteryProvider = CompositeBatteryProvider(providers: [
+        IOBluetoothBatteryProvider(),
+        SystemProfilerBatteryProvider(),
+    ])
 
     func start() {
         power.onPlug = { snapshot in
@@ -17,10 +23,59 @@ final class AppCoordinator {
             Task { @MainActor in AppCoordinator.shared.handleUnplug(snapshot) }
         }
         power.start()
+
+        bluetooth.onConnect = { name, address in
+            Task { @MainActor in AppCoordinator.shared.handleHeadphonesConnected(name: name, address: address) }
+        }
+        bluetooth.onDisconnect = { address in
+            Task { @MainActor in AppCoordinator.shared.handleHeadphonesDisconnected(address: address) }
+        }
+        bluetooth.start()
     }
 
     func stop() {
         power.stop()
+        bluetooth.stop()
+    }
+
+    // MARK: Headphones
+
+    private func handleHeadphonesConnected(name: String, address: String) {
+        guard settings.airPodsEnabled else { return }
+        showHeadphones(name: name, address: address, delay: VorsaintDetector.popupDelay)
+    }
+
+    private func handleHeadphonesDisconnected(address: String) {
+        notch.dismiss { content in
+            if case .headphones(let info) = content { return info.address == address }
+            return false
+        }
+    }
+
+    private func showHeadphones(name: String, address: String, delay: TimeInterval) {
+        let info = HeadphoneInfo(name: name, address: address,
+                                 kind: HeadphoneKind.detect(name: name, productID: nil))
+        SoundPlayer.play(.connect)
+        notch.present(.headphones(info), delay: delay)
+        loadBattery(into: info)
+    }
+
+    /// AirPods publish their levels a moment after the link comes up, so poll a few times.
+    private func loadBattery(into info: HeadphoneInfo) {
+        let provider = batteryProvider
+        Task { @MainActor in
+            for wait in [0.3, 1.0, 1.5, 2.0] {
+                try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+                guard let reading = await provider.readBattery(address: info.address, name: info.name) else {
+                    continue
+                }
+                if let productID = reading.productID {
+                    info.kind = HeadphoneKind.detect(name: info.name, productID: productID)
+                }
+                info.battery = reading.battery
+                if reading.battery.isComplete(for: info.kind) { return }
+            }
+        }
     }
 
     // MARK: Charging
@@ -40,6 +95,22 @@ final class AppCoordinator {
     // MARK: Tests (menu / settings)
 
     func testAirPods() {
+        if let device = BluetoothMonitor.connectedHeadphones().first {
+            showHeadphones(name: device.name ?? "Headphones",
+                           address: device.addressString ?? "",
+                           delay: 0)
+            return
+        }
+
+        // Nothing connected: show a sample AirPods Pro card.
+        let info = HeadphoneInfo(name: "AirPods Pro", address: "", kind: .airPodsPro)
+        SoundPlayer.play(.connect)
+        notch.present(.headphones(info))
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            info.battery = HeadphoneBattery(left: 82, right: 79, caseLevel: 56,
+                                            caseCharging: true)
+        }
     }
 
     func testCharging() {

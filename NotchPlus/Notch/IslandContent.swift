@@ -14,6 +14,7 @@ enum IslandStyle: Equatable {
 enum IslandContent {
     case charging(PowerSnapshot)
     case unplugged(PowerSnapshot)
+    case headphones(HeadphoneInfo)
 }
 
 extension IslandContent {
@@ -21,6 +22,7 @@ extension IslandContent {
         switch self {
         case .charging: return .pillThenCard
         case .unplugged: return .pillOnly
+        case .headphones: return .card(interactive: true)
         }
     }
 
@@ -28,6 +30,7 @@ extension IslandContent {
     var kind: String {
         switch self {
         case .charging, .unplugged: return "power"
+        case .headphones: return "headphones"
         }
     }
 
@@ -35,12 +38,14 @@ extension IslandContent {
         switch self {
         case .charging: return ChargingLayout.pillSize(notch: notch, plugged: true)
         case .unplugged: return ChargingLayout.pillSize(notch: notch, plugged: false)
+        case .headphones: return HeadphonesLayout.cardSize(notch: notch)
         }
     }
 
     func cardSize(notch: CGSize) -> CGSize {
         switch self {
         case .charging, .unplugged: return ChargingLayout.cardSize(notch: notch)
+        case .headphones: return HeadphonesLayout.cardSize(notch: notch)
         }
     }
 }
@@ -57,6 +62,8 @@ struct IslandContentView: View {
             ChargingIslandView(snapshot: snapshot, plugged: true, phase: phase, notch: notch)
         case .unplugged(let snapshot):
             ChargingIslandView(snapshot: snapshot, plugged: false, phase: phase, notch: notch)
+        case .headphones(let info):
+            HeadphonesCardView(info: info, phase: phase, notch: notch)
         }
     }
 }
