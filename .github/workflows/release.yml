@@ -1,0 +1,69 @@
+name: Build DMG
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Build app
+        run: |
+          xcodebuild \
+            -project NotchPlus.xcodeproj \
+            -scheme NotchPlus \
+            -configuration Release \
+            -derivedDataPath build \
+            -destination 'generic/platform=macOS' \
+            ARCHS=arm64 \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM= \
+            build
+
+      - name: Create DMG
+        run: |
+          APP=build/Build/Products/Release/NotchPlus.app
+          test -d "$APP"
+          mkdir -p dmg
+          cp -R "$APP" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "Notch+" -srcfolder dmg -ov -format UDZO NotchPlus.dmg
+          ls -lh NotchPlus.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NotchPlus-dmg
+          path: NotchPlus.dmg
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+            TITLE="Notch+ ${TAG}"
+          else
+            TAG="latest"
+            TITLE="Notch+ (latest build)"
+            gh release delete "$TAG" --yes --cleanup-tag || true
+          fi
+          gh release create "$TAG" NotchPlus.dmg \
+            --title "$TITLE" \
+            --target "$GITHUB_SHA" \
+            --notes "Built from ${GITHUB_SHA::7}. Ad-hoc signed, not notarized: after copying to Applications run \`xattr -cr /Applications/NotchPlus.app\` or right-click > Open the first time."

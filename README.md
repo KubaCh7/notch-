@@ -76,3 +76,17 @@ NotchPlus/
 
 - **Reduce Motion**: springs become short ease-in-out fades.
 - **Reduce Transparency**: glass becomes a solid dark surface.
+
+## Download
+
+Every push to `main` builds a DMG on GitHub Actions and publishes it as the
+[`latest` release](https://github.com/KubaCh7/notch-/releases/tag/latest).
+
+The app is ad-hoc signed and not notarized, so macOS blocks it the first time.
+After dragging it to Applications run:
+
+```sh
+xattr -cr /Applications/NotchPlus.app
+```
+
+or right-click the app > Open.
