@@ -79,8 +79,13 @@ NotchPlus/
 
 ## Download
 
-Every push to `main` builds a DMG on GitHub Actions and publishes it as the
-[`latest` release](https://github.com/KubaCh7/notch-/releases/tag/latest).
+Every push to `main` builds a DMG on GitHub Actions and publishes it as a new
+release tagged `v1.0.<build>`: [latest release](https://github.com/KubaCh7/notch-/releases/latest).
+
+Notch+ updates itself: it checks GitHub Releases on launch and every 6 hours
+(Settings > Updates, or "Check for Updates…" in the menu), downloads the DMG,
+swaps the app in place and relaunches. Keep the app in /Applications so it can
+replace itself.
 
 The app is ad-hoc signed and not notarized, so macOS blocks it the first time.
 After dragging it to Applications run:

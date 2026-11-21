@@ -3,7 +3,6 @@ name: Build DMG
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -34,6 +33,8 @@ jobs:
             CODE_SIGN_IDENTITY=- \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM= \
+            MARKETING_VERSION=1.0.${{ github.run_number }} \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             build
 
       - name: Create DMG
@@ -55,15 +56,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF_NAME}"
-            TITLE="Notch+ ${TAG}"
-          else
-            TAG="latest"
-            TITLE="Notch+ (latest build)"
-            gh release delete "$TAG" --yes --cleanup-tag || true
-          fi
+          # Old rolling release; its tag would shadow /releases/latest.
+          gh release delete latest --yes --cleanup-tag || true
+          TAG="v1.0.${{ github.run_number }}"
+          NOTES="$(git log -1 --pretty=%s)"
           gh release create "$TAG" NotchPlus.dmg \
-            --title "$TITLE" \
+            --title "Notch+ ${TAG#v}" \
             --target "$GITHUB_SHA" \
-            --notes "Built from ${GITHUB_SHA::7}. Ad-hoc signed, not notarized: after copying to Applications run \`xattr -cr /Applications/NotchPlus.app\` or right-click > Open the first time."
+            --latest \
+            --notes "$NOTES"

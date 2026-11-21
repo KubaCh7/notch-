@@ -12,6 +12,10 @@ final class AppSettings: ObservableObject {
         static let duration = "popupDuration"
         static let vorsaintDelay = "vorsaintDelay"
         static let playSound = "playSound"
+        static let showUnplug = "showUnplugAnimation"
+        static let autoCheckUpdates = "autoCheckUpdates"
+        static let skippedBuild = "skippedBuild"
+        static let all = [airPods, charging, duration, vorsaintDelay, playSound, showUnplug, autoCheckUpdates, skippedBuild]
     }
 
     static let durationRange: ClosedRange<Double> = 1.5...6.0
@@ -36,6 +40,17 @@ final class AppSettings: ObservableObject {
     @Published var playSound: Bool {
         didSet { defaults.set(playSound, forKey: Keys.playSound) }
     }
+    @Published var showUnplugAnimation: Bool {
+        didSet { defaults.set(showUnplugAnimation, forKey: Keys.showUnplug) }
+    }
+    @Published var autoCheckUpdates: Bool {
+        didSet { defaults.set(autoCheckUpdates, forKey: Keys.autoCheckUpdates) }
+    }
+    /// Build number the user chose to skip in the update prompt.
+    var skippedBuild: Int {
+        get { defaults.integer(forKey: Keys.skippedBuild) }
+        set { defaults.set(newValue, forKey: Keys.skippedBuild) }
+    }
     @Published private(set) var launchAtLogin: Bool = false
 
     private init() {
@@ -45,13 +60,28 @@ final class AppSettings: ObservableObject {
             Keys.duration: 2.5,
             Keys.vorsaintDelay: 0.6,
             Keys.playSound: false,
+            Keys.showUnplug: true,
+            Keys.autoCheckUpdates: true,
         ])
         airPodsEnabled = defaults.bool(forKey: Keys.airPods)
         chargingEnabled = defaults.bool(forKey: Keys.charging)
         popupDuration = defaults.double(forKey: Keys.duration)
         vorsaintDelay = defaults.double(forKey: Keys.vorsaintDelay)
         playSound = defaults.bool(forKey: Keys.playSound)
+        showUnplugAnimation = defaults.bool(forKey: Keys.showUnplug)
+        autoCheckUpdates = defaults.bool(forKey: Keys.autoCheckUpdates)
         refreshLaunchAtLogin()
+    }
+
+    func resetToDefaults() {
+        Keys.all.forEach { defaults.removeObject(forKey: $0) }
+        airPodsEnabled = defaults.bool(forKey: Keys.airPods)
+        chargingEnabled = defaults.bool(forKey: Keys.charging)
+        popupDuration = defaults.double(forKey: Keys.duration)
+        vorsaintDelay = defaults.double(forKey: Keys.vorsaintDelay)
+        playSound = defaults.bool(forKey: Keys.playSound)
+        showUnplugAnimation = defaults.bool(forKey: Keys.showUnplug)
+        autoCheckUpdates = defaults.bool(forKey: Keys.autoCheckUpdates)
     }
 
     func refreshLaunchAtLogin() {

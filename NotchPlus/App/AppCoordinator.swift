@@ -39,6 +39,8 @@ final class AppCoordinator {
             Task { @MainActor in AppCoordinator.shared.handleHeadphonesConnected(name: name, address: address) }
         }
         audioOutput.start()
+
+        Updater.shared.startAutomaticChecks()
     }
 
     func stop() {
@@ -102,7 +104,7 @@ final class AppCoordinator {
     }
 
     private func handleUnplug(_ snapshot: PowerSnapshot) {
-        guard settings.chargingEnabled else { return }
+        guard settings.chargingEnabled, settings.showUnplugAnimation else { return }
         SoundPlayer.play(.unplug)
         notch.present(.unplugged(snapshot), delay: VorsaintDetector.popupDelay)
     }
