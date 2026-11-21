@@ -10,6 +10,9 @@ final class AppCoordinator {
     private let settings = AppSettings.shared
     private let power = PowerMonitor()
     private let bluetooth = BluetoothMonitor()
+    private let audioOutput = AudioOutputMonitor()
+    /// Both monitors usually fire for one connection; show the card once.
+    private var lastHeadphonesShown: [String: Date] = [:]
     private let batteryProvider: BatteryProvider = CompositeBatteryProvider(providers: [
         IOBluetoothBatteryProvider(),
         SystemProfilerBatteryProvider(),
@@ -31,17 +34,29 @@ final class AppCoordinator {
             Task { @MainActor in AppCoordinator.shared.handleHeadphonesDisconnected(address: address) }
         }
         bluetooth.start()
+
+        audioOutput.onBluetoothOutput = { name, address in
+            Task { @MainActor in AppCoordinator.shared.handleHeadphonesConnected(name: name, address: address) }
+        }
+        audioOutput.start()
     }
 
     func stop() {
         power.stop()
         bluetooth.stop()
+        audioOutput.stop()
     }
 
     // MARK: Headphones
 
     private func handleHeadphonesConnected(name: String, address: String) {
         guard settings.airPodsEnabled else { return }
+
+        let key = name.lowercased()
+        let now = Date()
+        if let last = lastHeadphonesShown[key], now.timeIntervalSince(last) < 8 { return }
+        lastHeadphonesShown[key] = now
+
         showHeadphones(name: name, address: address, delay: VorsaintDetector.popupDelay)
     }
 
