@@ -72,7 +72,7 @@ final class AppCoordinator {
     private func showHeadphones(name: String, address: String, delay: TimeInterval) {
         let info = HeadphoneInfo(name: name, address: address,
                                  kind: HeadphoneKind.detect(name: name, productID: nil))
-        SoundPlayer.play(.connect)
+        SoundPlayer.play(.airpods)
         notch.present(.headphones(info), delay: delay)
         loadBattery(into: info)
     }
@@ -99,7 +99,7 @@ final class AppCoordinator {
 
     private func handlePlug(_ snapshot: PowerSnapshot) {
         guard settings.chargingEnabled else { return }
-        SoundPlayer.play(.plug)
+        // No sound here: macOS already plays its own charging chime on plug-in.
         notch.present(.charging(snapshot), delay: VorsaintDetector.popupDelay)
     }
 
@@ -121,7 +121,7 @@ final class AppCoordinator {
 
         // Nothing connected: show a sample AirPods Pro card.
         let info = HeadphoneInfo(name: "AirPods Pro", address: "", kind: .airPodsPro)
-        SoundPlayer.play(.connect)
+        SoundPlayer.play(.airpods)
         notch.present(.headphones(info))
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 350_000_000)

@@ -30,6 +30,13 @@ private struct GeneralSettings: View {
                     set: { settings.setLaunchAtLogin($0) }
                 ))
                 Toggle("Play Sound", isOn: $settings.playSound)
+                LabeledContent("Preview") {
+                    HStack {
+                        ForEach(SoundPlayer.Effect.allCases, id: \.self) { effect in
+                            Button(effect.title) { SoundPlayer.play(effect, force: true) }
+                        }
+                    }
+                }
             }
 
             Section("Bluetooth") {
