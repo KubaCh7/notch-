@@ -3,6 +3,9 @@ name: Preview Sounds
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   render:
     runs-on: macos-26
@@ -29,9 +32,13 @@ jobs:
           rm out/pop.wav
           for f in out/*.wav; do afconvert -f m4af -d aac -b 128000 "$f" "${f%.wav}.m4a"; done
           ls -la out
-          echo "=====BEGIN PREVIEWS====="
-          (cd out && tar czf - *.m4a) | base64 -b 100
-          echo "=====END PREVIEWS====="
+      - name: Push previews to a temporary branch
+        run: |
+          cd out
+          git init -q -b sound-previews
+          git add *.m4a
+          git -c user.name=ci -c user.email=ci@localhost commit -qm "Sound previews"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" sound-previews
       - uses: actions/upload-artifact@v4
         with:
           name: sound-previews
