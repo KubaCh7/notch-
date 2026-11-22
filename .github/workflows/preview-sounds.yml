@@ -27,7 +27,11 @@ jobs:
               w.close()
           PY
           rm out/pop.wav
+          for f in out/*.wav; do afconvert -f m4af -d aac -b 128000 "$f" "${f%.wav}.m4a"; done
           ls -la out
+          echo "=====BEGIN PREVIEWS====="
+          (cd out && tar czf - *.m4a) | base64 -b 100
+          echo "=====END PREVIEWS====="
       - uses: actions/upload-artifact@v4
         with:
           name: sound-previews
