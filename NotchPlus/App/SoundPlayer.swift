@@ -1,10 +1,9 @@
 import AVFoundation
 import AppKit
 
-/// All effects are built from the system "Pop":
-/// - plug: one Pop
-/// - unplug: one Pop, lower
-/// - airpods: two quick Pops going up, so it never sounds like the charger
+/// - plug: system "Pop"
+/// - unplug: "Pop", pitched lower
+/// - airpods: system "Purr", so it never sounds like the charger
 enum SoundPlayer {
     enum Effect: String, CaseIterable {
         case plug
@@ -24,7 +23,7 @@ enum SoundPlayer {
             switch self {
             case .plug: return [(1.0, 0)]
             case .unplug: return [(0.82, 0)]
-            case .airpods: return [(1.12, 0), (1.4, 0.1)]
+            case .airpods: return []
             }
         }
     }
@@ -40,6 +39,10 @@ enum SoundPlayer {
     /// Plays `effect` if "Play Sound" is on (or always when `force` is true, for previews).
     static func play(_ effect: Effect, force: Bool = false) {
         guard force || AppSettings.shared.playSound else { return }
+        if effect == .airpods {
+            NSSound(named: NSSound.Name("Purr"))?.play()
+            return
+        }
         if !playPitched(effect) {
             NSSound(named: NSSound.Name("Pop"))?.play()
         }
