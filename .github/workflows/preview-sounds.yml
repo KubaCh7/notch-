@@ -63,6 +63,9 @@ jobs:
           PY
           rm out/pop.wav
           for f in out/*.wav; do afconvert -f m4af -d aac -b 128000 "$f" "${f%.wav}.m4a"; done
+          for n in Glass Tink Ping Purr Bottle Hero Morse Submarine Blow Frog; do
+            afconvert -f m4af -d aac -b 128000 "/System/Library/Sounds/$n.aiff" "out/system-$n.m4a"
+          done
           ls -la out
       - name: Push previews to a temporary branch
         run: |
