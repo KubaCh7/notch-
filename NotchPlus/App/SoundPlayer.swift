@@ -1,8 +1,10 @@
 import AVFoundation
 import AppKit
 
-/// All effects use the system "Pop", pitched per effect so they're
-/// recognisable but feel like one family.
+/// All effects are built from the system "Pop":
+/// - plug: one Pop
+/// - unplug: one Pop, lower
+/// - airpods: two quick Pops going up, so it never sounds like the charger
 enum SoundPlayer {
     enum Effect: String, CaseIterable {
         case plug
@@ -17,21 +19,21 @@ enum SoundPlayer {
             }
         }
 
-        /// Varispeed rate: below 1 is lower, above 1 is higher.
-        var rate: Float {
+        /// (varispeed rate, start offset in seconds) for each Pop.
+        var hits: [(rate: Float, offset: TimeInterval)] {
             switch self {
-            case .plug: return 1.0
-            case .unplug: return 0.82
-            case .airpods: return 1.15
+            case .plug: return [(1.0, 0)]
+            case .unplug: return [(0.82, 0)]
+            case .airpods: return [(1.12, 0), (1.4, 0.1)]
             }
         }
     }
 
     private static let popURL = URL(fileURLWithPath: "/System/Library/Sounds/Pop.aiff")
+    private static let voiceCount = 2
 
     private static var engine: AVAudioEngine?
-    private static var player: AVAudioPlayerNode?
-    private static var varispeed: AVAudioUnitVarispeed?
+    private static var voices: [(player: AVAudioPlayerNode, varispeed: AVAudioUnitVarispeed)] = []
     private static var buffer: AVAudioPCMBuffer?
     private static var stopWork: DispatchWorkItem?
 
@@ -44,7 +46,7 @@ enum SoundPlayer {
     }
 
     private static func playPitched(_ effect: Effect) -> Bool {
-        guard prepare(), let engine, let player, let varispeed, let buffer else { return false }
+        guard prepare(), let engine, let buffer else { return false }
 
         // The engine only runs while a sound plays, so it never holds the
         // audio device; restarting per sound also follows output switches
@@ -53,13 +55,23 @@ enum SoundPlayer {
         if !engine.isRunning {
             do { try engine.start() } catch { return false }
         }
-        varispeed.rate = effect.rate
-        player.stop()
-        player.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
-        player.play()
+
+        for (index, voice) in voices.enumerated() {
+            voice.player.stop()
+            guard index < effect.hits.count else { continue }
+            let hit = effect.hits[index]
+            voice.varispeed.rate = hit.rate
+            voice.player.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
+            if hit.offset > 0 {
+                let player = voice.player
+                DispatchQueue.main.asyncAfter(deadline: .now() + hit.offset) { player.play() }
+            } else {
+                voice.player.play()
+            }
+        }
 
         let work = DispatchWorkItem {
-            player.stop()
+            voices.forEach { $0.player.stop() }
             engine.stop()
         }
         stopWork = work
@@ -75,16 +87,19 @@ enum SoundPlayer {
               (try? file.read(into: pcm)) != nil else { return false }
 
         let newEngine = AVAudioEngine()
-        let newPlayer = AVAudioPlayerNode()
-        let newVarispeed = AVAudioUnitVarispeed()
-        newEngine.attach(newPlayer)
-        newEngine.attach(newVarispeed)
-        newEngine.connect(newPlayer, to: newVarispeed, format: pcm.format)
-        newEngine.connect(newVarispeed, to: newEngine.mainMixerNode, format: pcm.format)
+        var newVoices: [(player: AVAudioPlayerNode, varispeed: AVAudioUnitVarispeed)] = []
+        for _ in 0..<voiceCount {
+            let player = AVAudioPlayerNode()
+            let varispeed = AVAudioUnitVarispeed()
+            newEngine.attach(player)
+            newEngine.attach(varispeed)
+            newEngine.connect(player, to: varispeed, format: pcm.format)
+            newEngine.connect(varispeed, to: newEngine.mainMixerNode, format: pcm.format)
+            newVoices.append((player, varispeed))
+        }
 
         engine = newEngine
-        player = newPlayer
-        varispeed = newVarispeed
+        voices = newVoices
         buffer = pcm
         return true
     }

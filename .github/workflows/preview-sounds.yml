@@ -15,19 +15,51 @@ jobs:
           mkdir out
           afconvert -f WAVE -d LEI16 /System/Library/Sounds/Pop.aiff out/pop.wav
           python3 - <<'PY'
-          import wave
+          import struct, wave
           src = wave.open("out/pop.wav", "rb")
           p = src.getparams()
-          frames = src.readframes(src.getnframes())
+          raw = src.readframes(src.getnframes())
           src.close()
-          # Same rates as SoundPlayer.Effect.rate (varispeed = resample).
-          for name, rate in [("plug", 1.0), ("unplug", 0.82), ("airpods", 1.15)]:
+          ch, sr = p.nchannels, p.framerate
+          n = len(raw) // (2 * ch)
+          data = struct.unpack("<%dh" % (n * ch), raw)
+          chans = [data[c::ch] for c in range(ch)]
+
+          def pitched(rate):
+              # varispeed = read the source faster/slower (linear interpolation)
+              m = int(n / rate)
+              out = []
+              for c in chans:
+                  col = []
+                  for i in range(m):
+                      x = i * rate
+                      j = int(x); f = x - j
+                      a = c[j]; b = c[j + 1] if j + 1 < n else 0
+                      col.append(a + (b - a) * f)
+                  out.append(col)
+              return out
+
+          # Same values as SoundPlayer.Effect.hits
+          effects = {
+              "plug": [(1.0, 0)],
+              "unplug": [(0.82, 0)],
+              "airpods": [(1.12, 0), (1.4, 0.1)],
+          }
+          for name, hits in effects.items():
+              length = max(int(n / r) + int(o * sr) for r, o in hits)
+              mix = [[0.0] * length for _ in range(ch)]
+              for rate, offset in hits:
+                  start = int(offset * sr)
+                  for c, col in enumerate(pitched(rate)):
+                      for i, v in enumerate(col):
+                          mix[c][start + i] += v
+              frames = bytearray()
+              for i in range(length):
+                  for c in range(ch):
+                      frames += struct.pack("<h", max(-32768, min(32767, int(mix[c][i]))))
               w = wave.open(f"out/{name}.wav", "wb")
-              w.setnchannels(p.nchannels)
-              w.setsampwidth(p.sampwidth)
-              w.setframerate(int(p.framerate * rate))
-              w.writeframes(frames)
-              w.close()
+              w.setnchannels(ch); w.setsampwidth(2); w.setframerate(sr)
+              w.writeframes(bytes(frames)); w.close()
           PY
           rm out/pop.wav
           for f in out/*.wav; do afconvert -f m4af -d aac -b 128000 "$f" "${f%.wav}.m4a"; done
