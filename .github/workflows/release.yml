@@ -3,6 +3,8 @@ name: Build DMG
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - ".github/workflows/preview-sounds.yml"
   workflow_dispatch:
 
 permissions:

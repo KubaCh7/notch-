@@ -1,0 +1,35 @@
+name: Preview Sounds
+
+on:
+  workflow_dispatch:
+
+jobs:
+  render:
+    runs-on: macos-26
+    steps:
+      - name: Render pitched Pop variants
+        run: |
+          mkdir out
+          afconvert -f WAVE -d LEI16 /System/Library/Sounds/Pop.aiff out/pop.wav
+          python3 - <<'PY'
+          import wave
+          src = wave.open("out/pop.wav", "rb")
+          p = src.getparams()
+          frames = src.readframes(src.getnframes())
+          src.close()
+          # Same rates as SoundPlayer.Effect.rate (varispeed = resample).
+          for name, rate in [("plug", 1.0), ("unplug", 0.82), ("airpods", 1.15)]:
+              w = wave.open(f"out/{name}.wav", "wb")
+              w.setnchannels(p.nchannels)
+              w.setsampwidth(p.sampwidth)
+              w.setframerate(int(p.framerate * rate))
+              w.writeframes(frames)
+              w.close()
+          PY
+          rm out/pop.wav
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sound-previews
+          path: out
+          retention-days: 3
